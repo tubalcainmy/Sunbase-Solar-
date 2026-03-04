@@ -413,6 +413,104 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Warning Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 500px;
+            margin: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            position: relative;
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-icon {
+            font-size: 60px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--solar-gold);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-text {
+            font-size: 16px;
+            color: var(--text-dark);
+            line-height: 1.8;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 12px 30px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn-yes {
+            background: linear-gradient(135deg, var(--solar-gold) 0%, #F97316 100%);
+            color: white;
+        }
+
+        .modal-btn-yes:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(245, 158, 11, 0.3);
+        }
+
+        .modal-btn-no {
+            background: #E2E8F0;
+            color: var(--text-dark);
+        }
+
+        .modal-btn-no:hover {
+            background: #CBD5E1;
+        }
     </style>
 </head>
 <body>
@@ -665,7 +763,7 @@
                 <div class="options">
                     <label class="option">
                         <input type="radio" name="monthlySpend" value="Under ₦30,000" required>
-                        <span>Under ₦30,000 (A full-scale solar installation may not be the smartest move for you right now due to the low ROI on your current energy spend.)</span>
+                        <span>Under ₦30,000</span>
                     </label>
                     <label class="option">
                         <input type="radio" name="monthlySpend" value="₦30,000 – ₦60,000">
@@ -746,8 +844,8 @@
                 </label>
                 <div class="options">
                     <label class="option">
-                        <input type="radio" name="hasRecommendation" value="Yes, I already have a specific kVA recommendation" required>
-                        <span>Yes, I already have a specific kVA recommendation (Based on my actual energy consumption.)</span>
+                        <input type="radio" name="hasRecommendation" value="Yes, I already have a specific kVA recommendation but am open to get a personalized based on my safety results" required>
+                        <span>Yes, I already have a specific kVA recommendation but am open to get a personalized based on my safety results</span>
                     </label>
                     <label class="option">
                         <input type="radio" name="hasRecommendation" value="I have a price, but I'm not sure about the technical capacity">
@@ -1097,10 +1195,6 @@ function determineLeadQualification(data) {
         return { status: 'not-lead', color: 'not-lead', reason: 'No immediate timeline' };
     }
     
-    if (data.hasRecommendation === 'Yes, I already have a specific kVA recommendation') {
-        return { status: 'not-lead', color: 'not-lead', reason: 'Already has installer recommendation' };
-    }
-    
     if (data.openToQuotation === 'No') {
         return { status: 'not-lead', color: 'not-lead', reason: 'Not open to quotation' };
     }
@@ -1166,7 +1260,53 @@ function showThankYouPage(qualification) {
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// Question 9 warning modal logic
+let budgetWarningShown = false;
+let selectedBudgetOption = null;
+
+document.querySelectorAll('input[name="monthlySpend"]').forEach(input => {
+    input.addEventListener('change', function() {
+        if (this.value === 'Under ₦30,000' && !budgetWarningShown) {
+            // Show modal
+            document.getElementById('budgetWarningModal').classList.add('show');
+            selectedBudgetOption = this;
+            budgetWarningShown = false; // Reset so they can see warning again if they reselect
+        }
+    });
+});
+
+function confirmLowBudget() {
+    // User confirmed - keep selection
+    budgetWarningShown = true;
+    document.getElementById('budgetWarningModal').classList.remove('show');
+}
+
+function cancelLowBudget() {
+    // User cancelled - uncheck the option
+    if (selectedBudgetOption) {
+        selectedBudgetOption.checked = false;
+        selectedBudgetOption.closest('.option').classList.remove('selected');
+    }
+    document.getElementById('budgetWarningModal').classList.remove('show');
+    budgetWarningShown = false;
+}
 </script>
+
+<!-- Warning Modal -->
+<div id="budgetWarningModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-icon">⚠️</div>
+        <h3 class="modal-title">Low Energy Spend Warning</h3>
+        <p class="modal-text">
+            A full-scale solar installation may not be the smartest move for you right now due to the low ROI on your current energy spend. Are you sure of your selection?
+        </p>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-no" onclick="cancelLowBudget()">No, Change Selection</button>
+            <button class="modal-btn modal-btn-yes" onclick="confirmLowBudget()">Yes, I'm Sure</button>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>
