@@ -743,43 +743,65 @@
                         <input type="radio" name="powerSource" value="PHCN + Generator">
                         <span>PHCN + Generator</span>
                     </label>
+                </div>
+            </div>
+
+            <!-- Question 9A: NEPA Bill -->
+            <div class="question">
+                <label class="question-label">
+                    <span class="question-number">9</span>
+                    How much do you spend monthly on NEPA (electricity bills)?
+                </label>
+                <div class="options">
                     <label class="option">
-                        <input type="radio" name="powerSource" value="Inverter (small)">
-                        <span>Inverter (small)</span>
+                        <input type="radio" name="nepaBill" value="Under ₦10,000" required>
+                        <span>Under ₦10,000</span>
                     </label>
                     <label class="option">
-                        <input type="radio" name="powerSource" value="Inverter (large)">
-                        <span>Inverter (large)</span>
+                        <input type="radio" name="nepaBill" value="₦10,000 – ₦20,000">
+                        <span>₦10,000 – ₦20,000</span>
+                    </label>
+                    <label class="option">
+                        <input type="radio" name="nepaBill" value="₦20,000 – ₦40,000">
+                        <span>₦20,000 – ₦40,000</span>
+                    </label>
+                    <label class="option">
+                        <input type="radio" name="nepaBill" value="₦40,000+">
+                        <span>₦40,000+</span>
+                    </label>
+                    <label class="option">
+                        <input type="radio" name="nepaBill" value="Not sure">
+                        <span>Not sure</span>
                     </label>
                 </div>
             </div>
 
-            <!-- Question 9: Monthly Spend -->
-            <div class="question">
+            <!-- Question 9B: Generator Fuel Spend (conditional) -->
+            <div class="question" id="fuelQuestion" style="display: none;">
                 <label class="question-label">
-                    <span class="question-number">9</span>
-                    About how much do you spend monthly on electricity + fuel?
+                    <span class="question-number">9b</span>
+                    How much do you spend monthly on generator fuel?
                 </label>
                 <div class="options">
                     <label class="option">
-                        <input type="radio" name="monthlySpend" value="Under ₦30,000" required>
-                        <span>Under ₦30,000</span>
+                        <input type="radio" name="fuelSpend" value="I don't use generator">
+                        <span>I don't use generator</span>
                     </label>
                     <label class="option">
-                        <input type="radio" name="monthlySpend" value="₦30,000 – ₦60,000">
+                        <input type="radio" name="fuelSpend" value="Under ₦10,000">
+                        <span>Under ₦10,000</span>
+                    </label>
+                    <label class="option">
+                        <input type="radio" name="fuelSpend" value="₦10,000 – ₦30,000">
+                        <span>₦10,000 – ₦30,000</span>
+                    </label>
+                    <label class="option">
+                        <input type="radio" name="fuelSpend" value="₦30,000 – ₦60,000">
                         <span>₦30,000 – ₦60,000</span>
                     </label>
                     <label class="option">
-                        <input type="radio" name="monthlySpend" value="₦60,000 – ₦100,000">
-                        <span>₦60,000 – ₦100,000</span>
-                    </label>
-                    <label class="option">
-                        <input type="radio" name="monthlySpend" value="Over ₦100,000">
-                        <span>Over ₦100,000</span>
-                    </label>
-                    <label class="option">
-                        <input type="radio" name="monthlySpend" value="Not sure">
-                        <span>Not sure</span>
+                        <input type="radio" name="fuelSpend" value="₦60,000+">
+                        <span>₦60,000+</span>
                     </label>
                 </div>
             </div>
@@ -1123,6 +1145,29 @@ document.querySelectorAll('.option').forEach(option => {
     });
 });
 
+// Show/hide fuel question based on power source
+document.querySelectorAll('input[name="powerSource"]').forEach(input => {
+    input.addEventListener('change', function() {
+        const fuelQuestion = document.getElementById('fuelQuestion');
+        const fuelInputs = document.querySelectorAll('input[name="fuelSpend"]');
+        
+        if (this.value === 'Generator only' || this.value === 'PHCN + Generator') {
+            // Show fuel question and make it required
+            fuelQuestion.style.display = 'block';
+            fuelInputs.forEach(input => input.required = true);
+        } else {
+            // Hide fuel question and make it not required
+            fuelQuestion.style.display = 'none';
+            fuelInputs.forEach(input => {
+                input.required = false;
+                input.checked = false;
+            });
+            // Auto-select "I don't use generator" for PHCN only users
+            document.querySelector('input[name="fuelSpend"][value="I don\'t use generator"]').checked = true;
+        }
+    });
+});
+
 // Form submission
 document.getElementById('solarForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -1148,6 +1193,43 @@ document.getElementById('solarForm').addEventListener('submit', async function(e
             data[key] = value;
         }
     }
+    
+    // Calculate combined monthly spend from NEPA + Fuel
+    const nepaBill = data.nepaBill || 'Under ₦10,000';
+    const fuelSpend = data.fuelSpend || 'I don\'t use generator';
+    
+    // Extract numeric values to calculate total
+    function extractAmount(range) {
+        if (range.includes('Under')) return 5000; // Assume ₦5k average for under ranges
+        if (range === 'I don\'t use generator') return 0;
+        if (range === 'Not sure') return 0;
+        
+        // Extract first number from range like "₦10,000 – ₦20,000"
+        const match = range.match(/₦?([\d,]+)/);
+        if (match) {
+            return parseInt(match[1].replace(/,/g, ''));
+        }
+        return 0;
+    }
+    
+    const nepaAmount = extractAmount(nepaBill);
+    const fuelAmount = extractAmount(fuelSpend);
+    const totalSpend = nepaAmount + fuelAmount;
+    
+    // Map total to spending range for webhook
+    if (totalSpend < 10000) {
+        data.monthlySpend = 'Under ₦30,000';
+    } else if (totalSpend < 30000) {
+        data.monthlySpend = '₦30,000 – ₦60,000';
+    } else if (totalSpend < 60000) {
+        data.monthlySpend = '₦60,000 – ₦100,000';
+    } else {
+        data.monthlySpend = 'Over ₦100,000';
+    }
+    
+    // Store individual values too for reference
+    data.nepaBillAmount = nepaBill;
+    data.fuelSpendAmount = fuelSpend;
     
     // Determine lead qualification
     const leadQualification = determineLeadQualification(data);
@@ -1186,8 +1268,26 @@ document.getElementById('solarForm').addEventListener('submit', async function(e
 
 // Determine lead qualification logic
 function determineLeadQualification(data) {
+    // Extract numeric values from NEPA and fuel
+    function getNumericValue(range) {
+        if (!range) return 0;
+        if (range.includes('Under')) return 5000;
+        if (range === 'I don\'t use generator') return 0;
+        if (range === 'Not sure') return 0;
+        
+        const match = range.match(/₦?([\d,]+)/);
+        if (match) {
+            return parseInt(match[1].replace(/,/g, ''));
+        }
+        return 0;
+    }
+    
+    const nepaAmount = getNumericValue(data.nepaBillAmount || data.nepaBill);
+    const fuelAmount = getNumericValue(data.fuelSpendAmount || data.fuelSpend);
+    
     // NOT A LEAD conditions
-    if (data.monthlySpend === 'Under ₦30,000') {
+    // Only reject if BOTH NEPA AND fuel are below ₦10k
+    if (nepaAmount < 10000 && fuelAmount < 10000) {
         return { status: 'not-lead', color: 'not-lead', reason: 'Low energy spend' };
     }
     
@@ -1261,52 +1361,7 @@ function showThankYouPage(qualification) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Question 9 warning modal logic
-let budgetWarningShown = false;
-let selectedBudgetOption = null;
-
-document.querySelectorAll('input[name="monthlySpend"]').forEach(input => {
-    input.addEventListener('change', function() {
-        if (this.value === 'Under ₦30,000' && !budgetWarningShown) {
-            // Show modal
-            document.getElementById('budgetWarningModal').classList.add('show');
-            selectedBudgetOption = this;
-            budgetWarningShown = false; // Reset so they can see warning again if they reselect
-        }
-    });
-});
-
-function confirmLowBudget() {
-    // User confirmed - keep selection
-    budgetWarningShown = true;
-    document.getElementById('budgetWarningModal').classList.remove('show');
-}
-
-function cancelLowBudget() {
-    // User cancelled - uncheck the option
-    if (selectedBudgetOption) {
-        selectedBudgetOption.checked = false;
-        selectedBudgetOption.closest('.option').classList.remove('selected');
-    }
-    document.getElementById('budgetWarningModal').classList.remove('show');
-    budgetWarningShown = false;
-}
 </script>
-
-<!-- Warning Modal -->
-<div id="budgetWarningModal" class="modal-overlay">
-    <div class="modal-content">
-        <div class="modal-icon">⚠️</div>
-        <h3 class="modal-title">Low Energy Spend Warning</h3>
-        <p class="modal-text">
-            A full-scale solar installation may not be the smartest move for you right now due to the low ROI on your current energy spend. Are you sure of your selection?
-        </p>
-        <div class="modal-buttons">
-            <button class="modal-btn modal-btn-no" onclick="cancelLowBudget()">No, Change Selection</button>
-            <button class="modal-btn modal-btn-yes" onclick="confirmLowBudget()">Yes, I'm Sure</button>
-        </div>
-    </div>
-</div>
 
 </body>
 </html>
